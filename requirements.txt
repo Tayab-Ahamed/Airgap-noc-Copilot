@@ -11,7 +11,7 @@ scikit-learn==1.5.0
 xgboost==2.0.3
 prophet==1.1.5
 
-# RAG / LLM (all run offline once models are pre-downloaded)
+# RAG / LLM (runs offline once models are downloaded)
 faiss-cpu==1.8.0
 sentence-transformers==3.0.1
 llama-index==0.10.50
@@ -22,11 +22,6 @@ requests==2.32.3
 # Parsing
 textfsm==1.1.3
 
-# Dev / test (optional at the venue; needed for `make test` and CI)
+# Testing & Dev
 pytest==8.2.2
 httpx==0.27.0
-
-# Note: at an air-gapped venue, pre-download wheels:
-#   pip download -r requirements.txt -d wheelhouse/
-# then install with:
-#   pip install --no-index --find-links wheelhouse/ -r requirements.txt

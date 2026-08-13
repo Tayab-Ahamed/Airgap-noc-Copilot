@@ -1,12 +1,9 @@
 """Optional LangGraph orchestration (an UPGRADE, not a dependency).
 
 The backend works with a single copilot call. This graph adds explicit
-Root-Cause -> Prediction-Verify -> Explain stages for a more impressive
-architecture slide. It degrades gracefully: if langgraph isn't installed,
-`run_pipeline` falls back to a plain sequential call.
-
-Keep this minimal during the hackathon \u2014 every extra node is another thing that
-can break live.
+Root-Cause -> Prediction-Verify -> Explain stages for a clear architecture flow.
+It degrades gracefully: if langgraph isn't installed, `run_pipeline` falls back to
+a plain sequential call.
 """
 from __future__ import annotations
 
