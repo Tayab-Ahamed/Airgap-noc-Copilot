@@ -1,0 +1,38 @@
+# containerlab topology: minimal but representative SD-WAN over MPLS underlay
+# Roles: CE (customer edge) - PE (provider edge) - P (provider core)
+# Run:  sudo containerlab deploy -t topology.clab.yml
+name: airgap-noc
+
+topology:
+  kinds:
+    linux:
+      image: frrouting/frr:v8.4.0
+  nodes:
+    # --- Branch site ---
+    ce1:
+      kind: linux
+      binds: [configs/ce1:/etc/frr]
+    pe1:
+      kind: linux
+      binds: [configs/pe1:/etc/frr]
+    # --- Core ---
+    p1:
+      kind: linux
+      binds: [configs/p1:/etc/frr]
+    # --- Datacenter site ---
+    pe2:
+      kind: linux
+      binds: [configs/pe2:/etc/frr]
+    ce2:
+      kind: linux
+      binds: [configs/ce2:/etc/frr]
+
+  links:
+    - endpoints: ["ce1:eth1", "pe1:eth1"]   # branch CE-PE
+    - endpoints: ["pe1:eth2", "p1:eth1"]    # PE-P (MPLS core)
+    - endpoints: ["p1:eth2", "pe2:eth1"]    # P-PE (MPLS core)
+    - endpoints: ["pe2:eth2", "ce2:eth1"]   # DC PE-CE
+
+# Notes:
+# - Enable MPLS/LDP + OSPF in the core, BGP VPNv4 between PEs, IPSec overlay on CEs.
+# - The fault_injector.py drives degradation on these nodes/links for the demo.

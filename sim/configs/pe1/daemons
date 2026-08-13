@@ -1,0 +1,21 @@
+# /etc/frr/daemons  (PE1)
+# Enable OSPF, LDP, BGP, and BFD for fast failure detection.
+bgpd=yes
+ospfd=yes
+ospf6d=no
+ripd=no
+ripngd=no
+isisd=no
+pimd=no
+ldpd=yes
+nhrpd=no
+eigrpd=no
+babeld=no
+sharpd=no
+pbrd=no
+bfdd=yes
+fabricd=no
+vrrpd=no
+pathd=no
+zebra=yes
+staticd=yes

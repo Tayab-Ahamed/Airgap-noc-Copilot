@@ -1,0 +1,32 @@
+# Optional: run the whole stack offline. The network is locked down so the app
+# cannot reach the internet \u2014 only internal services + localhost Ollama.
+version: "3.9"
+
+services:
+  backend:
+    build: .
+    command: uvicorn backend.main:app --host 0.0.0.0 --port 8000
+    environment:
+      - USE_OLLAMA=1
+      - OLLAMA_URL=http://ollama:11434
+      - MODEL_DIR=/app/models
+      - INDEX_DIR=/app/data/faiss_index
+    volumes:
+      - ./:/app
+    ports:
+      - "8000:8000"
+    networks: [internal]
+
+  ollama:
+    image: ollama/ollama:latest
+    volumes:
+      - ollama_models:/root/.ollama   # pre-populate this volume while online
+    networks: [internal]
+
+volumes:
+  ollama_models:
+
+networks:
+  internal:
+    driver: bridge
+    internal: true   # <-- no egress to the internet; proves air-gap at the network layer

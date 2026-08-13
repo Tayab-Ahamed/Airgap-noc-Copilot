@@ -1,0 +1,9 @@
+.venv/
+__pycache__/
+*.pyc
+data/
+models/
+tests/
+.git/
+.github/
+frontend/node_modules/

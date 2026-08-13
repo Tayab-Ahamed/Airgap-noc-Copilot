@@ -1,0 +1,28 @@
+# Python / Environment
+.venv/
+venv/
+ENV/
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+
+# Data & Runtime Artifacts
+data/*.csv
+data/*.parquet
+data/faiss_index/
+data/testmodels/
+models/v_*/
+
+# IDE & OS
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+
+# Local Env
+.env

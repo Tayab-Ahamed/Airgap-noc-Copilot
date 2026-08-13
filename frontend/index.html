@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Air-Gapped NOC Copilot</title>
+<style>
+  :root { --bg:#0b1020; --panel:#141a2e; --line:#243049; --txt:#e6ecff; --muted:#8aa0c8;
+          --green:#37d67a; --amber:#ffc043; --red:#ff5c5c; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:Inter,system-ui,Arial,sans-serif; background:var(--bg); color:var(--txt); }
+  header { padding:14px 20px; border-bottom:1px solid var(--line); display:flex; align-items:center; gap:12px; }
+  header h1 { font-size:16px; margin:0; }
+  .pill { font-size:11px; padding:3px 8px; border-radius:999px; background:#10331f; color:var(--green); border:1px solid #1c5c36; }
+  .wrap { display:grid; grid-template-columns: 1fr 1fr; gap:16px; padding:16px; }
+  .panel { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:14px; }
+  .panel h2 { font-size:13px; margin:0 0 10px; color:var(--muted); text-transform:uppercase; letter-spacing:.06em; }
+  table { width:100%; border-collapse:collapse; font-size:13px; }
+  th,td { text-align:left; padding:7px 6px; border-bottom:1px solid var(--line); }
+  .dot { width:9px; height:9px; border-radius:50%; display:inline-block; margin-right:6px; }
+  .scenarios button, .ask button { background:#1d2945; color:var(--txt); border:1px solid var(--line);
+    border-radius:8px; padding:7px 10px; margin:3px 4px 0 0; cursor:pointer; font-size:12px; }
+  .scenarios button:hover, .ask button:hover { border-color:#3a64ff; }
+  .ask input { width:100%; padding:9px; border-radius:8px; border:1px solid var(--line);
+    background:#0e1426; color:var(--txt); margin:6px 0; }
+  .copilot { white-space:pre-wrap; font-size:13px; line-height:1.5; }
+  .kv { color:var(--muted); }
+  .tti { color:var(--amber); font-weight:600; }
+  svg { width:100%; height:220px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>\ud83d\udef0\ufe0f Air-Gapped Predictive NOC Copilot</h1>
+  <span class="pill" id="airgap">OFFLINE \u2022 no egress</span>
+  <span class="kv" id="clock" style="margin-left:auto;font-size:12px"></span>
+</header>
+
+<div class="wrap">
+  <div class="panel">
+    <h2>Topology</h2>
+    <svg id="topo"></svg>
+    <div class="scenarios" id="scenarios"></div>
+  </div>
+
+  <div class="panel">
+    <h2>Predictive Risk (live)</h2>
+    <table id="risk"><thead><tr><th>Node</th><th>Predicted</th><th>Conf.</th><th>Time-to-impact</th></tr></thead><tbody></tbody></table>
+  </div>
+
+  <div class="panel" style="grid-column:1 / span 2">
+    <h2>Copilot</h2>
+    <div class="ask">
+      <input id="q" placeholder="Ask: e.g. 'What's about to fail and what do I do?'" />
+      <button onclick="ask()">Ask copilot</button>
+    </div>
+    <div class="copilot" id="answer"><span class="kv">Inject a scenario, then ask the copilot.</span></div>
+  </div>
+</div>
+
+<script>
+const API = "http://localhost:8000";
+const riskColor = (issue, conf) => issue==="nominal" ? "var(--green)" : (conf>0.75 ? "var(--red)" : "var(--amber)");
+
+async function loadTopology(){
+  const t = await (await fetch(`${API}/api/topology`)).json();
+  const svg = document.getElementById("topo");
+  const W=svg.clientWidth||500, H=220, n=t.nodes.length;
+  const pos={}; t.nodes.forEach((nd,i)=>{ pos[nd.id]=[40+(i*(W-80)/(n-1)), H/2]; });
+  let s="";
+  t.links.forEach(l=>{ const a=pos[l.source],b=pos[l.target]; s+=`<line x1='${a[0]}' y1='${a[1]}' x2='${b[0]}' y2='${b[1]}' stroke='#33415f' stroke-width='2'/>`; });
+  t.nodes.forEach(nd=>{ const p=pos[nd.id]; s+=`<circle id='node-${nd.id}' cx='${p[0]}' cy='${p[1]}' r='16' fill='#1d2945' stroke='#3a64ff'/><text x='${p[0]}' y='${p[1]+34}' fill='#8aa0c8' font-size='11' text-anchor='middle'>${nd.id} (${nd.role})</text>`; });
+  svg.innerHTML=s;
+}
+
+async function loadScenarios(){
+  const d = await (await fetch(`${API}/api/scenarios`)).json();
+  document.getElementById("scenarios").innerHTML =
+    d.scenarios.map(s=>`<button onclick="inject('${s.name}')">Inject: ${s.name} \u2192 ${s.target}</button>`).join("");
+}
+
+async function inject(name){
+  await fetch(`${API}/api/scenarios/inject`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({scenario_name:name})});
+}
+
+function renderRisk(items){
+  const tb=document.querySelector("#risk tbody");
+  tb.innerHTML = items.map(it=>{
+    const tti = it.time_to_impact_s==null ? "\u2014" : `<span class='tti'>~${Math.round(it.time_to_impact_s)}s</span>`;
+    const c = riskColor(it.predicted_issue, it.confidence);
+    const node = document.getElementById(`node-${it.node}`);
+    if(node) node.setAttribute("fill", it.predicted_issue==="nominal" ? "#1d2945" : c);
+    return `<tr><td><span class='dot' style='background:${c}'></span>${it.node}</td><td>${it.predicted_issue}</td><td>${(it.confidence*100|0)}%</td><td>${tti}</td></tr>`;
+  }).join("");
+}
+
+async function ask(){
+  const q = document.getElementById("q").value;
+  document.getElementById("answer").textContent = "Thinking (offline)\u2026";
+  const a = await (await fetch(`${API}/api/copilot/query`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({question:q})})).json();
+  const tti = a.time_to_impact_s==null ? "n/a" : `~${Math.round(a.time_to_impact_s)}s`;
+  document.getElementById("answer").innerHTML =
+    `<b>Predicted issue:</b> ${a.predicted_issue}  <span class='kv'>(confidence ${(a.confidence*100|0)}%, time-to-impact ${tti})</span>\n`+
+    `<b>Root cause:</b> ${a.root_cause}\n`+
+    `<b>Affected scope:</b> ${a.affected_scope}\n`+
+    `<b>Recommended actions:</b>\n - ${(a.recommended_actions||[]).join("\n - ")}\n\n`+
+    `<b>Explanation:</b>\n${a.explanation}\n\n<span class='kv'>Sources: ${(a.sources||[]).join(", ")}</span>`;
+}
+
+function connectWS(){
+  try {
+    const ws = new WebSocket(`ws://localhost:8000/ws/risk`);
+    ws.onmessage = e => renderRisk(JSON.parse(e.data).items);
+    ws.onclose = () => setTimeout(connectWS, 2000);
+  } catch(_) { setInterval(async ()=>{ const r=await (await fetch(`${API}/api/risk/current`)).json(); renderRisk(r.items); }, 5000); }
+}
+
+setInterval(()=>document.getElementById("clock").textContent=new Date().toLocaleTimeString(),1000);
+loadTopology(); loadScenarios(); connectWS();
+</script>
+</body>
+</html>
