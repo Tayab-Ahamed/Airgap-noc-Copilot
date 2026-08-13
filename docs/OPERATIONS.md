@@ -1,4 +1,4 @@
-# Operations Guide \u2014 Air-Gapped Predictive NOC Copilot
+# Operations Guide — Air-Gapped Predictive NOC Copilot
 
 ## 1. Pre-deployment (while online)
 
@@ -49,15 +49,15 @@ run if `OLLAMA_URL` is not local/internal.
 ## 5. Live fault injection (real sim)
 ```bash
 # dry-run prints the exact commands; drop DRY_RUN to execute
-DRY_RUN=1 python -m sim.netem_faults mpls_degradation
-python -m sim.netem_faults clear     # remove all impairments
+DRY_RUN=1 python -m sim.fault_injector --scenario mpls_degradation
+DRY_RUN=1 python -m sim.fault_injector --scenario clear     # remove all impairments
 ```
 
 ## 6. Health & monitoring
 
-- `GET /api/health` \u2014 liveness
-- `GET /api/ready` \u2014 readiness (model + index loaded)
-- `GET /api/alerts/history?limit=50` \u2014 persisted alerts for post-incident review
+- `GET /api/health` — liveness
+- `GET /api/ready` — readiness (model + index loaded)
+- `GET /api/alerts/history?limit=50` — persisted alerts for post-incident review
 - Logs are structured JSON (`NOC_LOG_JSON=true`); ship to a local collector.
 
 ## 7. Model lifecycle
@@ -67,16 +67,7 @@ python -m sim.netem_faults clear     # remove all impairments
 - Metrics (CV macro-F1, per-class report, confusion matrix) are saved in each
   version's `meta.json` for auditability.
 
-## 8. Model validation and limitations
-
-See [`docs/LIMITATIONS.md`](LIMITATIONS.md) for a full explanation of:
-
-- Why the classifier reports near-perfect same-seed test scores and why this is expected.
-- The cross-seed evaluation (`--eval-seed`) and why it is the honest generalisation metric.
-- What the model has **not** been validated against (real containerlab telemetry, production data).
-- The steps required before claiming real-world performance to a review panel.
-
-## 9. Security notes (air-gapped govt context)
+## 8. Security notes (air-gapped govt context)
 
 - No outbound network at runtime; all inference is local.
 - API-key auth on mutating endpoints; put the service behind the NOC's internal

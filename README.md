@@ -1,165 +1,175 @@
-# 🛰️ Air-Gapped Predictive NOC Copilot (ISRO PS13)
+# Air-Gapped Predictive NOC Copilot (ISRO PS13)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-green.svg)](https://fastapi.tiangolo.com/)
 [![FAISS RAG](https://img.shields.io/badge/RAG-FAISS%20%2B%20BGE--Small-orange.svg)](https://github.com/facebookresearch/faiss)
-[![Air-Gapped](https://img.shields.io/badge/Security-100%25%20Air--Gapped-red.svg)](#-security--air-gap-compliance)
+[![Air-Gapped Compliance](https://img.shields.io/badge/Security-100%25%20Air--Gapped-red.svg)](#security--air-gap-compliance)
 
-> 📌 **Evaluators:** See [`docs/SUBMISSION.md`](docs/SUBMISSION.md) for the evaluation-dimension map and the step-by-step 5-minute live demo script. See [`docs/LIMITATIONS.md`](docs/LIMITATIONS.md) for model evaluation metrics & validation details.
-
-An autonomous, **fully offline, air-gapped AI Network Operations Center (NOC) Copilot** that:
-
-1. **Predicts** MPLS & SD-WAN network faults *before* user-visible impact (precursor trend detection, not reactive threshold breaches).
-2. **Explains** precursor signals in plain natural language (root cause analysis, confidence scores, affected scope, and priority remediation steps).
-3. **Operates 100% Air-Gapped** — strictly zero outbound cloud calls or external dependencies at runtime.
+An autonomous, production-grade, air-gapped AI Network Operations Center (NOC) Copilot engineered for zero-cloud environments. The system combines real-time time-series precursor telemetry modeling with local Retrieval-Augmented Generation (RAG) over internal router runbooks to detect and mitigate network anomalies prior to SLA impact.
 
 ---
 
-## 📐 Architecture & Workflow
+## Architecture
+
+```mermaid
+flowchart TD
+    subgraph Data Layer & Telemetry
+        A[Containerlab FRR Topology] --> B[Telemetry Collector / Telegraf]
+        B --> C[Rolling Window Feature Engineering]
+    end
+
+    subgraph Machine Learning Pipeline
+        C --> D[Gradient Boosting Classifier]
+        D --> E[Risk Scorer & Precursor Estimation]
+    end
+
+    subgraph Inference & Copilot Engine
+        E --> F[FastAPI Backend & WebSockets]
+        G[Local RAG: FAISS + BGE-Small] --> F
+        H[Local LLM Engine: Ollama / Fallback] --> F
+    end
+
+    subgraph Operator Dashboard
+        F --> I[Real-Time Operations Frontend]
+    end
+```
+
+### Data & Execution Flow Diagram
 
 ```
-┌─────────────────┐      ┌─────────────┐      ┌─────────────────┐      ┌────────────────────┐
-│ Containerlab    │ ───► │ Telemetry   │ ───► │ Feature         │ ───► │ ML Risk Engine     │
-│ FRR Topology    │      │ Collector   │      │ Engineering     │      │ (GradientBoosting) │
-└─────────────────┘      └─────────────┘      └─────────────────┘      └─────────┬──────────┘
-                                                                                 │ (Risk & Time-to-Impact)
-                                              ┌─────────────────┐                ▼
-                                              │ Ollama Local    │ ───► ┌────────────────────┐
-                                              │ LLM + FAISS RAG │      │ FastAPI Backend    │ ──► Real-Time React
-                                              │ (Runbooks DB)   │ ───► └────────────────────┘     Dashboard
-                                              └─────────────────┘
+Containerlab FRR Sim ──► Telemetry Collector ──► Feature Engineering ──► ML Risk Engine
+                                                                              │
+                                                                              ▼
+              Local LLM + FAISS RAG (Runbooks DB) ───────────────► FastAPI Backend ──► Real-Time Dashboard
 ```
 
-> 🛡️ **Core Architectural Principle:** The **ML Engine Predicts**, and the **Local LLM Narrates** those predictions over RAG-retrieved internal runbooks. The LLM never hallucinates or invents predictions.
+The core architectural principle dictates strict separation of duties: the **Machine Learning Engine calculates failure probability and time-to-impact**, while the **Local LLM Engine generates narrative explanations and actionable CLI runbook steps**. The LLM operates purely on retrieved contextual evidence and does not forecast failure metrics independently.
 
 ---
 
-## ✨ Key Features
+## Technical Overview
 
-- 🔮 **Precursor Fault Forecasting**: Detects 4 major network fault classes (`congestion`, `bgp_instability`, `mpls_degradation`, `policy_drift`) 60–90 seconds before network degradation.
-- 📚 **Retrieval-Augmented Generation (RAG)**: Uses FAISS vector search over NOC internal runbooks to supply actionable, step-by-step remediation procedures with exact `vtysh` and `tc` CLI commands.
-- ⚡ **Zero-Cloud Air-Gap Architecture**: Built with local embedding models (`BAAI/bge-small-en-v1.5`), local Ollama LLM, and self-contained Python pipelines.
-- 🌐 **Realistic Containerlab Topology**: 5-node FRR network (`CE1 ── PE1 ── P1 ── PE2 ── CE2`) running real OSPF, LDP, iBGP VPNv4, and IPsec configuration stubs.
-- 🧪 **Live Fault Injection Framework**: Ramps network impairments (`tc netem/tbf` & `vtysh clear bgp`) with full `DRY_RUN` emulation mode.
-- 📊 **Real-Time Operations Dashboard**: WebSocket-driven frontend showing node health, risk trend charts, active alerts, and an interactive AI Copilot query panel.
-
----
-
-## 🚀 Quickstart (Runs on any laptop without Sim/Ollama)
-
-The repo includes a **synthetic telemetry generator** and a **mock-LLM fallback** so you can test the complete pipeline out-of-the-box on any machine.
-
-```bash
-# 1. Clone repository & create virtual environment
-git clone https://github.com/Tayab-Ahamed/Airgap-noc-Copilot.git
-cd Airgap-noc-Copilot
-python3 -m venv .venv
-
-# On Linux/macOS:
-source .venv/bin/activate
-# On Windows PowerShell:
-# .venv\Scripts\Activate.ps1
-
-# 2. Install dependencies
-pip install -r requirements.txt
-
-# 3. Generate a synthetic telemetry dataset
-python -m ml.synthetic_data --minutes 240 --out data/telemetry.parquet
-
-# 4. Train the prediction engine with cross-seed evaluation
-python -m ml.train --data data/telemetry.parquet --out models/ --eval-seed 42
-
-# 5. Index the NOC runbooks for RAG
-python -m rag.indexer --docs rag/runbooks --out data/faiss_index
-
-# 6. Launch the backend server
-uvicorn backend.main:app --port 8000
-
-# 7. Open the Frontend Dashboard
-# Open frontend/index.html directly in any web browser (talks to http://localhost:8000)
-```
+* **Precursor Fault Forecasting**: Identifies early degradation patterns across 4 network failure modes (`congestion`, `bgp_instability`, `mpls_degradation`, `policy_drift`) 60 to 90 seconds prior to user-visible service loss.
+* **Air-Gapped RAG Engine**: Utilizes vector search (`FAISS` with `BAAI/bge-small-en-v1.5` embeddings) across internal network runbooks to construct targeted mitigation steps containing exact `vtysh` and `tc` commands.
+* **Deterministic Risk Scoring**: Evaluates rolling window statistical metrics (mean, standard deviation, deltas, and 5-minute slopes) on 11 raw interface and routing telemetry attributes.
+* **Emulated Multi-Node Topology**: Built for containerlab deployments using `frrouting/frr:v8.4.0` nodes executing OSPF Area 0, MPLS LDP, iBGP VPNv4, and IPsec tunnel stubs across customer edge (CE), provider edge (PE), and core (P) routers.
+* **Fault Injection Framework**: Includes ramping live traffic impairment drivers for network testing and continuous validation with full dry-run capability.
 
 ---
 
-## 🛠️ Deploying on Live Simulation (Containerlab)
+## Getting Started
 
-For production or air-gapped venue deployment on a Linux machine with Docker:
+### Prerequisites
 
-### 1. Enable Kernel Modules & Prerequisites
-```bash
-# Load MPLS router kernel modules
-sudo modprobe mpls_router
-sudo modprobe mpls_iptunnel
+* Python 3.10 or higher
+* `pip` package manager
+* Linux/macOS or Windows PowerShell environment
 
-# Install Containerlab if not present
-bash -c "$(curl -sL https://get.containerlab.dev)"
-```
+### Local Setup
 
-### 2. Deploy FRR Topology
-```bash
-cd sim/
-sudo containerlab deploy -t topology.clab.yml
-```
+1. Clone the repository and navigate to the project root:
+   ```bash
+   git clone https://github.com/Tayab-Ahamed/Airgap-noc-Copilot.git
+   cd Airgap-noc-Copilot
+   ```
 
-### 3. Verify Router Adjacencies & MPLS Path
-```bash
-# Check OSPF neighbor on PE1 (Expect FULL state to P1)
-sudo docker exec -it clab-airgap-noc-pe1 vtysh -c "show ip ospf neighbor"
+2. Create and activate a Python virtual environment:
+   ```bash
+   python3 -m venv .venv
+   source .venv/bin/activate
+   ```
 
-# Check LDP label bindings on core router P1
-sudo docker exec -it clab-airgap-noc-p1 vtysh -c "show mpls ldp binding"
+3. Install required dependencies:
+   ```bash
+   pip install -r requirements.txt
+   ```
 
-# Check iBGP VPNv4 status between PE1 and PE2
-sudo docker exec -it clab-airgap-noc-pe1 vtysh -c "show bgp summary"
+4. Generate synthetic telemetry dataset:
+   ```bash
+   python -m ml.synthetic_data --minutes 240 --out data/telemetry.parquet
+   ```
 
-# Test customer end-to-end VPN reachability
-sudo docker exec -it clab-airgap-noc-ce2 ping -c 3 10.0.0.1
-```
+5. Train the risk prediction model:
+   ```bash
+   python -m ml.train --data data/telemetry.parquet --out models/ --eval-seed 42
+   ```
 
-### 4. Run Fault Injection (Dry-Run or Live)
-```bash
-# Dry-run mode (prints tc / vtysh commands without execution)
-DRY_RUN=1 python -m sim.fault_injector --scenario congestion --target PE1
+6. Build the vector database index from runbooks:
+   ```bash
+   python -m rag.indexer --docs rag/runbooks --out data/faiss_index
+   ```
 
-# Clear all active impairments
-DRY_RUN=1 python -m sim.fault_injector --scenario clear
-```
+7. Start the API service:
+   ```bash
+   uvicorn backend.main:app --port 8000
+   ```
 
-### 5. Tear Down Simulation
-```bash
-sudo containerlab destroy -t sim/topology.clab.yml --cleanup
-```
-
----
-
-## 📂 Repository Structure
-
-```
-├── backend/            # FastAPI backend, API routes, WebSocket streaming & risk scoring
-├── ml/                 # Telemetry generator, feature engineering, XGBoost/GBDT classifier
-├── rag/                # FAISS vector indexer, retriever, and Markdown NOC runbooks
-├── llm/                # Ollama LLM integration & offline mock fallback
-├── sim/                # Containerlab topology, FRR node configs, and live fault injector
-├── telemetry/          # Telegraf collector configs & metric parsing
-├── parsers/            # TextFSM & regex parsers for router syslog/CLI output
-├── frontend/           # Single-file HTML/JS interactive real-time NOC dashboard
-├── docs/               # Detailed documentation: SUBMISSION.md, LIMITATIONS.md, OPERATIONS.md
-├── tests/              # Pytest automated test suite
-├── requirements.txt    # Python dependencies
-└── LICENSE             # MIT Open Source License
-```
+8. Access the dashboard by opening `frontend/index.html` in your browser.
 
 ---
 
-## 🔒 Security & Air-Gap Compliance
+## Containerlab Emulation Deployment
 
-- **No Outbound Network Traffic**: The backend enforces `settings.assert_airgap_safe()` at startup and refuses non-local `OLLAMA_URL` connections.
-- **Air-Gap Verification Script**: Run `bash scripts/verify_airgap.sh` at venue startup to verify zero external IP reachability.
-- **Pre-download Utilities**: `scripts/predownload.sh` downloads Ollama models, HuggingFace embeddings, Docker images, and Python wheels prior to air-gapping.
+To run against a live network simulation environment:
+
+1. Load the required kernel modules on the Linux host:
+   ```bash
+   sudo modprobe mpls_router
+   sudo modprobe mpls_iptunnel
+   ```
+
+2. Deploy the network topology:
+   ```bash
+   cd sim/
+   sudo containerlab deploy -t topology.clab.yml
+   ```
+
+3. Verify control plane adjacencies:
+   ```bash
+   sudo docker exec -it clab-airgap-noc-pe1 vtysh -c "show ip ospf neighbor"
+   sudo docker exec -it clab-airgap-noc-pe1 vtysh -c "show bgp summary"
+   ```
+
+4. Run fault injection scenarios:
+   ```bash
+   DRY_RUN=1 python -m sim.fault_injector --scenario congestion --target PE1
+   DRY_RUN=1 python -m sim.fault_injector --scenario clear
+   ```
+
+5. Teardown topology:
+   ```bash
+   sudo containerlab destroy -t sim/topology.clab.yml --cleanup
+   ```
 
 ---
 
-## 📄 License
+## Directory Structure
 
-Distributed under the **MIT License**. See [`LICENSE`](LICENSE) for details.
+| Directory | Purpose |
+|---|---|
+| `backend/` | FastAPI application, REST endpoints, WebSocket streaming, and risk evaluation |
+| `core/` | Configuration management, security assertions, and SQLite storage |
+| `ml/` | Telemetry processing, feature engineering, baseline & XGBoost/GBDT classifiers |
+| `rag/` | FAISS index generation, vector retriever, and markdown NOC runbooks |
+| `llm/` | Local Ollama integration interface and offline fallback handlers |
+| `sim/` | Containerlab topology definition, FRR node configuration files, and fault injector |
+| `telemetry/` | Telegraf configuration files for SNMP/gNMI data ingestion |
+| `frontend/` | Standalone real-time NOC operations dashboard interface |
+| `docs/` | Operations manual and deployment documentation |
+| `scripts/` | Dependency predownloading and network air-gap validation scripts |
+
+---
+
+## Security & Air-Gap Compliance
+
+- Zero external HTTP/HTTPS egress at runtime.
+- Backend validates network connectivity isolation via `settings.assert_airgap_safe()`.
+- Runbook context retrieval uses local filesystem vector storage (`data/faiss_index`).
+- Verification script available via `bash scripts/verify_airgap.sh`.
+
+---
+
+## License
+
+This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.
