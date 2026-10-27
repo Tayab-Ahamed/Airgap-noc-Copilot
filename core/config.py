@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
+from urllib.parse import urlsplit
 
 
 def _bool(name: str, default: bool) -> bool:
@@ -40,10 +41,20 @@ class Settings:
 
     # Safety: refuse to start if a cloud-looking endpoint is configured.
     def assert_airgap_safe(self) -> None:
-        bad = ("http://", "https://")
         url = self.ollama_url
-        if not (url.startswith("http://localhost") or url.startswith("http://127.0.0.1")
-                or url.startswith("http://ollama")):
+        try:
+            endpoint = urlsplit(url)
+            # Accessing port also validates malformed/out-of-range ports.
+            endpoint.port
+            safe = (
+                endpoint.scheme in {"http", "https"}
+                and endpoint.hostname in {"localhost", "127.0.0.1", "::1", "ollama"}
+                and endpoint.username is None
+                and endpoint.password is None
+            )
+        except ValueError:
+            safe = False
+        if not safe:
             raise RuntimeError(
                 f"OLLAMA_URL={url} is not a local/internal endpoint; refusing for air-gap safety."
             )
